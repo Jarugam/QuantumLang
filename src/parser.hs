@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Main where
+module Parser where
 
 import Text.Parsec
     ( digit,
