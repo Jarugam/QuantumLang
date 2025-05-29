@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Main where
+module Parser where
 import Text.Parsec.Char (char)
 --import qualified Text.Parsec.Token as Tok
 import Text.Parsec (option)
