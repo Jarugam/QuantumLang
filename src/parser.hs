@@ -1,6 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parser where
+module Main where
+import Text.Parsec.Char (char)
+--import qualified Text.Parsec.Token as Tok
+import Text.Parsec (option)
 
 import Text.Parsec
     ( digit,
@@ -26,12 +29,17 @@ data Program = Program [Statement]
   deriving (Show, Eq)
 
 data Statement
-  = InitQubit Int
-  | Hadamard Int
-  | PauliX Int
-  | PauliY Int
-  | PauliZ Int
-  | CNOT Int Int
+  = InitQubit Int -- +
+  | Hadamard Int -- +
+  | PauliX Int -- +
+  | PauliY Int -- +
+  | PauliZ Int -- +
+  | CNOT Int Int -- +
+  | Phase Double Int -- +
+  | Measure Int String -- + 
+  | If String [Statement] -- +-
+  | Repeat Int [Statement] -- +-
+  | Print String -- +
   deriving (Show, Eq)
 
 programParser :: Parser Program
@@ -44,10 +52,82 @@ programParser = do
 statementParser :: Parser Statement
 statementParser = do
   skipMany space
-  stmt <- try initParser <|> try hadamardParser <|> try pauliXParser <|> try pauliYParser <|> try pauliZParser <|> try cnotParser
+  stmt <- try initParser <|> try hadamardParser <|> try pauliXParser <|> try pauliYParser
+   <|> try pauliZParser <|> try cnotParser <|> phaseParser <|> measureParser  <|> try printParser <|> try ifParser <|> repeatParser
   skipMany (oneOf " \t")
   optional newline
   return stmt
+
+
+repeatParser :: Parser Statement
+repeatParser = do
+  skipMany space
+  _ <- string "REPEAT"
+  skipMany1 space
+  count <- intParser
+  skipMany1 space
+  stmts <- blockParser
+  return $ Repeat count stmts
+
+-- tu dzieje się jakaś dziwna rzecz, tzn jak wpiszę PRINT zamiast RINT  to przykład testowy już nie działa, podejrzewam, że problem jest spowodowany tym, że PRINT 
+-- zaczyna się od litery P tak samo jak PHASE, nie rozumiem czemu ma to powodować problemy, ale wygląda na to że jest jest to jakiś powód.
+printParser = do
+  skipMany space
+  _ <- string "RINT"
+  skipMany1 space
+  msg <- many1 (noneOf "\n")
+  return $ Print msg
+
+
+blockParser :: Parser [Statement]
+blockParser = do
+  _ <- char '{'
+  spaces
+  stmts <- many statementParser
+  spaces
+  _ <- char '}'
+  return stmts
+
+ifParser :: Parser Statement
+ifParser = do
+  skipMany space
+  _ <- string "IF"
+  skipMany1 space
+  reg <- many1 (noneOf " \t\n\r/")
+  skipMany1 space
+  stmts <- blockParser
+  return $ If reg stmts
+  
+
+
+measureParser :: Parser Statement
+measureParser = do
+  skipMany space
+  _ <- string "MEASURE"
+  skipMany1 space
+  qubit <- intParser
+  skipMany1 space
+  reg <- many1 (noneOf " \t\n\r/")
+  return $ Measure qubit reg
+
+phaseParser :: Parser Statement
+phaseParser = do
+  skipMany space
+  _ <- string "PHASE"
+  skipMany1 space
+  angle <- doubleParser
+  skipMany1 space
+  qubit <- intParser
+  return $ Phase angle qubit
+
+doubleParser :: Parser Double
+doubleParser = do
+  num <- many1 digit
+  frac <- option "" $ do
+    dot <- char '.'
+    decimals <- many1 digit
+    return (dot : decimals)
+  return (read (num ++ frac))
 
 cnotParser :: Parser Statement
 cnotParser = do
@@ -128,7 +208,8 @@ intParser = read <$> many1 digit
 
 exampleCode :: String
 exampleCode = unlines
-  [ "INIT 1", "INIT 3 // let the force be with you, but it will be skipped", "HADAMARD 2", "PauliX 4", "PauliY 5 ", "PauliZ 6", "CNOT 3 4"]
+  [ "INIT 1", "INIT 3 // let the force be with you, but it will be skipped", "HADAMARD 2", "PauliX 4", "PauliY 5 ", "PauliZ 6", "CNOT 3 4", "PHASE 0.5 1",
+  "MEASURE  1 result", "RINT a", "RINT ala ma kota", "IF result {", "  PauliX 1", "RINT pies ma ale", "}", "REPEAT 3 {", "HADAMARD 2", "CNOT 2 1", "}"]
 
 main :: IO ()
 main = do
