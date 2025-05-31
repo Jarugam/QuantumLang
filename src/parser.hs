@@ -1,9 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Parser where
 import Text.Parsec.Char (char)
 --import qualified Text.Parsec.Token as Tok
 import Text.Parsec (option)
+import qualified Text.Parsec.Token as Token
+import Text.Parsec.Language (emptyDef)
 
 import Text.Parsec
     ( digit,
@@ -26,7 +30,7 @@ import Text.Parsec
 import Text.Parsec.String (Parser)
 
 data Program = Program [Statement]
-  deriving (Show, Eq)
+  deriving (Eq)
 
 data Statement
   = InitQubit Int -- +
@@ -41,6 +45,48 @@ data Statement
   | Repeat Int [Statement] -- +-
   | Print String -- +
   deriving (Show, Eq)
+
+instance Show Program where
+  show :: Program -> String
+  show (Program stmts) = unlines (map show stmts)
+
+lexer :: Token.TokenParser ()
+lexer = Token.makeTokenParser style
+  where
+    style = emptyDef
+      { Token.commentLine = "//"
+      , Token.reservedNames = 
+        [ "INIT", "HADAMARD", "PAULIX", "PAULIY", "PAULIZ"
+        , "CNOT", "PHASE", "MEASURE", "IF", "REPEAT", "PRINT"
+        ]
+      }
+
+identifier :: Parser String
+identifier = Token.identifier lexer
+
+reserved :: String -> Parser ()
+reserved = Token.reserved lexer
+
+integer :: Parser Int
+integer = fromIntegral <$> Token.integer lexer
+
+double :: Parser Double
+double = Token.float lexer
+
+stringLiteral :: Parser String
+stringLiteral = Token.stringLiteral lexer
+
+parens :: Parser a -> Parser a
+parens = Token.parens lexer
+
+brackets :: Parser a -> Parser a
+brackets = Token.brackets lexer
+
+whiteSpace :: Parser ()
+whiteSpace = Token.whiteSpace lexer
+
+commaSep :: Parser a -> Parser [a]
+commaSep = Token.commaSep lexer
 
 programParser :: Parser Program
 programParser = do
