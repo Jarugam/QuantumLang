@@ -3,6 +3,11 @@
 {-# LANGUAGE InstanceSigs #-}
 
 module Parser where
+import System.Environment (getArgs)
+import System.IO
+--import Text.Parsec (parse)
+import System.Exit (exitFailure)
+
 import Text.Parsec.Char (char)
 --import qualified Text.Parsec.Token as Tok
 import Text.Parsec (option)
@@ -257,13 +262,31 @@ exampleCode = unlines
   [ "INIT 1", "INIT 3 // let the force be with you, but it will be skipped", "HADAMARD 2", "PauliX 4", "PauliY 5 ", "PauliZ 6", "CNOT 3 4", "PHASE 0.5 1",
   "MEASURE  1 result", "RINT a", "RINT ala ma kota", "IF result {", "  PauliX 1", "RINT pies ma ale", "}", "REPEAT 3 {", "HADAMARD 2", "CNOT 2 1", "}"]
 
-main :: IO ()
-main = do
-  case parse programParser "" exampleCode of
-    Left err -> putStrLn $ "Parse error:\n" ++ show err
-    Right ast -> print ast
+-- main :: IO ()
+-- main = do
+--   case parse programParser "" exampleCode of
+--     Left err -> putStrLn $ "Parse error:\n" ++ show err
+--     Right ast -> print ast
 
     -- these lines below are applied to parsers functions and skips comments
   --optional (try (string "//" >> many (noneOf "\n")))
   --skipMany (oneOf " \t")
   --optional newline
+
+
+main :: IO ()
+main = do
+  args <- getArgs
+  case args of
+    [fileName] -> do
+      content <- readFile fileName
+      case parse programParser fileName content of
+        Left err -> do
+          putStrLn $ "Błąd parsowania:\n" ++ show err
+          exitFailure
+        Right ast -> do
+          putStrLn "Parsowanie zakończone sukcesem. AST:"
+          print ast
+    _ -> do
+      putStrLn "Użycie: ./mojProgram <ścieżka/do/pliku.txt>"
+      exitFailure
