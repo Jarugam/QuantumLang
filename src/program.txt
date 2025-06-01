@@ -4,15 +4,15 @@ INIT 1
 
 HADAMARD 0
 PHASE 0.5 0
-PauliX 1
+PAULIX 1
 CNOT 0 1
 
 
-MEASURE 1 result
+MEASURE 1 -> result
 
 IF result {
-  RINT Warunek spelniony
-  PauliZ 0
+  PRINT "Warunek spelniony"
+  PAULIZ 0
 }
 
 
@@ -22,4 +22,4 @@ REPEAT 2 {
 }
 
 
-RINT Koniec programu
+PRINT "Koniec programu"
