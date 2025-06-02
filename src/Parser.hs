@@ -361,19 +361,19 @@ exampleCode1 = unlines
 --     Left err -> putStrLn $ "Parse error:\n" ++ show err
 --     Right ast -> print ast
 
-main :: IO ()
-main = do
-  args <- getArgs
-  case args of
-    [fileName] -> do
-      content <- readFile fileName
-      case parse programParser fileName content of
-        Left err -> do
-          putStrLn $ "Blad parsowania:\n" ++ show err
-          exitFailure
-        Right ast -> do
-          putStrLn "Parsowanie zakonczone sukcesem. AST:"
-          print ast
-    _ -> do
-      putStrLn "Uzycie: ./mojProgram <sciezka/do/pliku.txt>"
-      exitFailure
+-- main :: IO ()
+-- main = do
+--   args <- getArgs
+--   case args of
+--     [fileName] -> do
+--       content <- readFile fileName
+--       case parse programParser fileName content of
+--         Left err -> do
+--           putStrLn $ "Blad parsowania:\n" ++ show err
+--           exitFailure
+--         Right ast -> do
+--           putStrLn "Parsowanie zakonczone sukcesem. AST:"
+--           print ast
+--     _ -> do
+--       putStrLn "Uzycie: ./mojProgram <sciezka/do/pliku.txt>"
+--       exitFailure
