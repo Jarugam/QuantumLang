@@ -48,7 +48,8 @@ lexer = Token.makeTokenParser style
               "IF",
               "REPEAT",
               "PRINT"
-            ]
+            ],
+          Token.reservedOpNames = ["->"]
         }
 
 identifier :: Parser String
@@ -142,12 +143,13 @@ measureStmt = do
   reserved "MEASURE"
   firstVal <- integer
   _ <- symbol "->"
-  Measure firstVal <$> identifier
+  name <- identifier <|> stringLiteral 
+  pure $ Measure firstVal name
 
 ifStmt :: Parser Statement
 ifStmt = do
   reserved "IF"
-  measurement <- identifier
+  measurement <- identifier <|> stringLiteral
   If measurement <$> braces (many statement)
 
 repeatStmt :: Parser Statement
@@ -209,7 +211,7 @@ exampleCode1 =
       "MEASURE 2 -> result",
       "IF result {INIT 1}",
       "REPEAT 21 {}",
-      "PRINT ProgramHasFinished"
+      "PRINT \"Program Has Finished\""
     ]
 
 parseCode :: IO () -- For testing purposes
