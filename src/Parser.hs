@@ -163,7 +163,8 @@ repeatStmt = do
 printStmt :: Parser Statement
 printStmt = do
   reserved "PRINT"
-  Print <$> stringLiteral
+  msg <- stringLiteral <|> identifier
+  return $ Print msg
 
 programParser :: Parser Program
 programParser = do
