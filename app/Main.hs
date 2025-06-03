@@ -41,8 +41,8 @@ examplePrograms =
     
     , ("Hadamard gate", "HADAMARD 0")
     , ("Pauli gates", unlines["PAULIX 1", "PAULIY 0", "PAULIZ -1"])
-    , ("Double input gates", unlines["CNOT -2 1", "", "PHASE 0.0 4", "MEASURE 1 -> \"result\""])
-    , ("List input gatest", unlines[ "IF \"result\" {PRINT \"test\" \nINIT 1}"
+    , ("Double input gates", unlines["CNOT -2 1", "//Comment test", "PHASE 0.0 4", "MEASURE 1 -> result"])
+    , ("List input gates", unlines[ "IF \"result\" {PRINT \"test\" \nINIT 1}"
                                     ,"REPEAT 3 {HADAMARD 1 \nPAULIX 0 \nPRINT \"Iteration finished\"}"])]
 
 runExamples :: IO ()

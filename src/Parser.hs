@@ -142,9 +142,8 @@ measureStmt :: Parser Statement
 measureStmt = do
   reserved "MEASURE"
   firstVal <- integer
-  _ <- symbol "->"
-  name <- identifier <|> stringLiteral 
-  pure $ Measure firstVal name
+  _ <- symbol "->" 
+  Measure firstVal <$> identifier
 
 ifStmt :: Parser Statement
 ifStmt = do
@@ -161,8 +160,7 @@ repeatStmt = do
 printStmt :: Parser Statement
 printStmt = do
   reserved "PRINT"
-  message <- stringLiteral <|> identifier
-  pure $ Print message
+  Print <$> stringLiteral
 
 programParser :: Parser Program
 programParser = do
