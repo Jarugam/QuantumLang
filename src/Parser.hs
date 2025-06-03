@@ -62,7 +62,10 @@ integer :: Parser Int
 integer = fromIntegral <$> Token.integer lexer
 
 double :: Parser Double
-double = Token.float lexer
+double = do 
+  sign <- option id (char '-' >> return negate)
+  num <- Token.float lexer
+  return (sign num)
 
 stringLiteral :: Parser String
 stringLiteral = Token.stringLiteral lexer
@@ -205,7 +208,7 @@ exampleCode1 =
       "PAULIX   -   1 // whitespace test",
       "  PAULIZ 4",
       "CNOT 10 -4",
-      "PHASE 1.5 1",
+      "PHASE -1.5 1",
       "MEASURE 2 -> result",
       "IF result {INIT 1}",
       "REPEAT 21 {}",

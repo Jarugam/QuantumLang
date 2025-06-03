@@ -1,0 +1,120 @@
+module Parser.ParserSpec (tests) where
+
+import Test.Framework (testGroup)
+import Test.Framework.Providers.HUnit (testCase)
+import Test.Framework.Providers.QuickCheck2 (testProperty)
+import Test.HUnit
+import Test.QuickCheck
+
+import Control.Monad (liftM)
+import Text.Parsec (ParseError, parse)
+import Parser
+
+tests = 
+    [ testGroup "Unit tests" unitTests
+    , testGroup "Property-based tests" propertyTests
+    ]
+
+parseTest :: (Show a, Eq a) => (String -> Either ParseError a) -> String -> a -> Assertion
+parseTest parser input expected = 
+    case parser input of
+        Left err -> assertFailure $ "Parse error: " ++ show err
+        Right result -> assertEqual ("Parsing: " ++ input) expected result
+
+-- Unit tests
+
+test_INIT :: Assertion
+test_INIT = parseTest parseProgram "INIT 402" (Program [InitQubit 402]) 
+
+test_PRINT :: Assertion
+test_PRINT = parseTest parseProgram "PRINT \"\"" (Program [Print ""])
+
+test_MEASURE :: Assertion
+test_MEASURE = parseTest parseProgram "MEASURE 1 -> result_1" (Program [Measure 1 "result_1"])
+
+test_REPEAT :: Assertion
+test_REPEAT = parseTest parseProgram "REPEAT 2 {PRINT \"w 1 31 adsa w    ,.! a\"\nINIT 2\nHADAMARD 3}" 
+    (Program [Repeat 2 [Print "w 1 31 adsa w    ,.! a", InitQubit 2, Hadamard 3]])
+
+test_PHASE :: Assertion
+test_PHASE = parseTest parseProgram "PHASE 0.0201 2" (Program [Phase 0.0201 2])
+
+-- Property test
+
+genIdentifier :: Gen String
+genIdentifier = do
+    first <- elements ['a' .. 'z']
+    rest <- listOf $ elements $ ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9'] ++ ['_']
+    return (first : take 10 rest)
+
+genStringLit :: Gen String
+genStringLit = resize 20 $ listOf $ elements $
+                ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9'] ++ [' ', '!', '?', '.', ',']
+
+genSmallInt :: Gen Int
+genSmallInt = choose (-100, 100)
+genSmallPositiveInt :: Gen Int
+genSmallPositiveInt = choose (1, 100)
+genSmallDouble :: Gen Double
+genSmallDouble  = choose (-100.00, 100.00)
+
+prop_INIT :: Property
+prop_INIT = forAll genSmallInt $ \n ->
+    let
+        val = n
+        prog = Program[InitQubit val]
+        src = "INIT " ++ show n
+    in
+        parseProgram src === Right prog
+
+prop_PHASE :: Property
+prop_PHASE = forAll genSmallDouble $ \n ->
+    forAll genSmallInt $ \m ->
+        let
+            doubleVal = n
+            intVal = m
+            prog = Program[Phase doubleVal intVal]
+            src = "PHASE " ++ show doubleVal ++ " " ++ show intVal
+        in
+            parseProgram src === Right prog 
+
+prop_PRINT :: Property
+prop_PRINT = forAll genStringLit $ \msg ->
+    let
+        prog = Program[Print msg]
+        src = "PRINT \"" ++ msg ++ "\""
+    in
+        parseProgram src === Right prog
+
+prop_MEASURE :: Property
+prop_MEASURE = forAll genIdentifier $ \var ->
+    forAll genSmallPositiveInt $ \val ->
+    let
+        prog = Program[Measure val var]
+        src = "MEASURE " ++ show val ++ " -> " ++ var
+    in
+        parseProgram src == Right prog  
+
+prop_Whitespace :: Property
+prop_Whitespace = forAll genSmallInt $ \n ->
+    let 
+        compact = "INIT " ++ show n
+        spaced = " INIT       " ++ show n
+    in
+        parseProgram compact === parseProgram spaced
+
+-- Test groups
+
+unitTests = 
+    [ testCase "Qubit initialization" test_INIT
+    , testCase "Empty print" test_PRINT
+    , testCase "Measure variable name" test_MEASURE
+    , testCase "Complex repeat test" test_REPEAT
+    , testCase "Phase gate test" test_PHASE]
+
+propertyTests =
+    [ testProperty "Integers initialize correctly" prop_INIT
+    , testProperty "Doubles parsing in phase gate" prop_PHASE
+    , testProperty "String parsing in print" prop_PRINT
+    , testProperty "Identifier parsing in measure" prop_MEASURE
+    , testProperty "Whitespace is insignificant" prop_Whitespace]
