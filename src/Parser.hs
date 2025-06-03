@@ -151,7 +151,7 @@ measureStmt = do
 ifStmt :: Parser Statement
 ifStmt = do
   reserved "IF"
-  measurement <- identifier <|> stringLiteral
+  measurement <- identifier
   If measurement <$> braces (many statement)
 
 repeatStmt :: Parser Statement

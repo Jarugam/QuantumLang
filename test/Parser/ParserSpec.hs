@@ -89,11 +89,11 @@ prop_PRINT = forAll genStringLit $ \msg ->
 prop_MEASURE :: Property
 prop_MEASURE = forAll genIdentifier $ \var ->
     forAll genSmallPositiveInt $ \val ->
-    let
-        prog = Program[Measure val var]
-        src = "MEASURE " ++ show val ++ " -> " ++ var
-    in
-        parseProgram src == Right prog  
+        let
+            prog = Program[Measure val var]
+            src = "MEASURE " ++ show val ++ " -> " ++ var
+        in
+            parseProgram src == Right prog  
 
 prop_Whitespace :: Property
 prop_Whitespace = forAll genSmallInt $ \n ->
@@ -110,7 +110,7 @@ unitTests =
     , testCase "Empty print" test_PRINT
     , testCase "Measure variable name" test_MEASURE
     , testCase "Complex repeat test" test_REPEAT
-    , testCase "Phase gate test" test_PHASE]
+    , testCase "Phase gate negative angle test" test_PHASE]
 
 propertyTests =
     [ testProperty "Integers initialize correctly" prop_INIT
