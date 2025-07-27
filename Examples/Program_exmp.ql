@@ -11,7 +11,6 @@ CNOT 0 1
 MEASURE 1 -> result
 
 IF result {
-  PRINT "Warunek spelniony"
   PAULIZ 0
 }
 
@@ -21,5 +20,4 @@ REPEAT 2 {
   CNOT 0 1
 }
 
-
-PRINT "Koniec programu"
+PRINT result

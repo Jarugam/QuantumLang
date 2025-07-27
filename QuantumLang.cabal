@@ -38,9 +38,11 @@ library
   build-depends:
       base >=4.7 && <5
     , containers >=0.6
+    , matrix
     , mtl >=2.2
     , parsec
     , random >=1.2
+    , vector >=0.13.2.0
   default-language: Haskell2010
 
 executable QuantumLang-exe
@@ -56,9 +58,11 @@ executable QuantumLang-exe
       QuantumLang
     , base >=4.7 && <5
     , containers >=0.6
+    , matrix
     , mtl >=2.2
     , parsec
     , random >=1.2
+    , vector >=0.13.2.0
   default-language: Haskell2010
 
 test-suite QuantumLang-test
@@ -78,10 +82,12 @@ test-suite QuantumLang-test
     , QuickCheck >=2.14
     , base >=4.7 && <5
     , containers >=0.6
+    , matrix
     , mtl >=2.2
     , parsec
     , random >=1.2
     , test-framework >=0.8
     , test-framework-hunit >=0.3
     , test-framework-quickcheck2 >=0.3
+    , vector >=0.13.2.0
   default-language: Haskell2010
