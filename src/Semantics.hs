@@ -48,7 +48,7 @@ execStmt stmt = do
             env <- get
             let newQubits = replicate n initQubit
                 updatedQubits = qubits env ++ newQubits
-            put Env { qubits = updatedQubits }
+            put env {qubits = updatedQubits}
             liftIO $ putStrLn $ "Initialized " ++ show n ++ " qubits"
 
         Hadamard qubitId -> do
@@ -105,7 +105,16 @@ execStmt stmt = do
                         _ -> do
                             liftIO $ putStrLn "Qubits left unchanged (ket 0 as control case)"
                 else do
-                    liftIO $ putStrLn "Cnot gate for entangled qubits remains to be implemented"
+                    let productVector = tensorProduct controlQubit targetQubit
+                    conrolCheck <- isEntangled controlQubitId
+                    targetCheck <- isEntangled targetQubitId
+                    (if conrolCheck || targetCheck then (do
+                        liftIO $ putStrLn "Remains to be implemented") else (do
+                        let newVector = applyGate cnot productVector
+                            newQubits = replace controlQubitId newVector (replace targetQubitId newVector qubitList)
+                            newEntanglement = entangledId env ++ [[controlQubitId, targetQubitId]]
+                        put env {qubits = newQubits, entangledId = newEntanglement}))
+        _ -> undefined
 
 
 
@@ -146,6 +155,13 @@ execStmt stmt = do
             let entagledList = entangledId env
             return $ any (qubitId' `elem`) entagledList
 
+        tensorProduct :: [Complex Double] -> [Complex Double] -> [Complex Double]
+        tensorProduct [] _ = []
+        tensorProduct _ [] = []
+        tensorProduct (x:xs) vector2 =
+            let y = map (x *) vector2
+                ys = tensorProduct xs vector2
+            in y ++ ys
 
 execProgram :: [Statement] -> EvalM ()
 execProgram = mapM_ execStmt
@@ -158,4 +174,4 @@ runProgram list = do
         initialEnv = Env {vars = Map.empty ,qubits = [], entangledId = []}
 
 example1 :: [Statement]
-example1 = [InitQubit 2, PauliX 1, CNOT 0 1]
+example1 = [InitQubit 2, Hadamard 0, CNOT 0 1]
