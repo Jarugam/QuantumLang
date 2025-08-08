@@ -47,14 +47,17 @@ execStmt stmt = do
             when (n < 1) $ liftIO $ putStrLn "Invalid ammount of initialized qubits"
             env <- get
             let newQubits = replicate n initQubit
+                lastId = length $ entangledId env
                 updatedQubits = qubits env ++ newQubits
-            put env {qubits = updatedQubits}
+                newEntanglement = map (: []) $ take n $ drop lastId [0..]
+                updatedEntanglement = entangledId env ++ newEntanglement
+            put env {qubits = updatedQubits, entangledId = updatedEntanglement}
             liftIO $ putStrLn $ "Initialized " ++ show n ++ " qubits"
 
         Hadamard qubitId -> do
             let hadamard = fromLists
-                    [ [1/sqrt (2) :+ 0, 1/sqrt (2) :+ 0]
-                    , [1/sqrt (2) :+ 0, (- (1 / sqrt (2))) :+ 0]
+                    [ [1/sqrt 2 :+ 0, 1/sqrt 2 :+ 0]
+                    , [1/sqrt 2 :+ 0, (- (1 / sqrt 2)) :+ 0]
                     ]
             applySingleGate "Hadamard" hadamard qubitId
 
@@ -85,13 +88,7 @@ execStmt stmt = do
                 length (qubits env) <= targetQubitId || targetQubitId < 0
                 then liftIO $ putStrLn $ "No valid qubit with ID = " ++ show controlQubitId ++ " , or ID = " ++ show targetQubitId
             else do
-                let cnot = fromLists
-                            [ [1 :+ 0, 0 :+ 0, 0 :+ 0, 0 :+ 0]
-                            , [0 :+ 0, 1 :+ 0, 0 :+ 0, 0 :+ 0]
-                            , [0 :+ 0, 0 :+ 0, 0 :+ 0, 1 :+ 0]
-                            , [0 :+ 0, 0 :+ 0, 1 :+ 0, 0 :+ 0]
-                            ]
-                    qubitList = qubits env
+                let qubitList = qubits env
                     controlQubit = qubitList !! controlQubitId
                     targetQubit = qubitList !! targetQubitId
                 if isBasisState controlQubit && isBasisState targetQubit then do
@@ -102,18 +99,19 @@ execStmt stmt = do
                                 newQubits = replace targetQubitId newTarget qubitList
                             put env {qubits = newQubits}
                             liftIO $ putStrLn $ "Cnot gate applied with cotrol = " ++ show controlQubitId ++ " and target = " ++ show targetQubitId
-                        _ -> do
-                            liftIO $ putStrLn "Qubits left unchanged (ket 0 as control case)"
+                        _ -> liftIO $ putStrLn "Qubits left unchanged (ket 0 as control case)"
                 else do
                     let productVector = tensorProduct controlQubit targetQubit
-                    conrolCheck <- isEntangled controlQubitId
-                    targetCheck <- isEntangled targetQubitId
-                    (if conrolCheck || targetCheck then (do
-                        liftIO $ putStrLn "Remains to be implemented") else (do
-                        let newVector = applyGate cnot productVector
-                            newQubits = replace controlQubitId newVector (replace targetQubitId newVector qubitList)
-                            newEntanglement = entangledId env ++ [[controlQubitId, targetQubitId]]
-                        put env {qubits = newQubits, entangledId = newEntanglement}))
+                        newVector = applyCnot productVector
+                        oldEntanglement = entangledId env
+                        controlEntanglement = oldEntanglement !! controlQubitId
+                        targetEntanglement = oldEntanglement !! targetQubitId
+                        newEntanglement = updateEntanglementList (controlEntanglement ++ targetEntanglement) oldEntanglement
+                        oldQubits = qubits env
+                        newQubits = updateQubitList (controlEntanglement ++ targetEntanglement) newVector oldQubits
+                    put env {qubits = newQubits, entangledId = newEntanglement}
+                    liftIO $ putStrLn $ "Cnot gate applied with cotrol = " ++ show controlQubitId ++ " and target = " ++ show targetQubitId
+
         _ -> undefined
 
 
@@ -121,6 +119,7 @@ execStmt stmt = do
 
     currentState <- get
     liftIO $ putStrLn $ "Current state vector: " ++ show (qubits currentState) ++ "\n--------------------------------------------"
+    liftIO $ putStrLn $ "Current entanglements: " ++ show (entangledId currentState) ++ "\n--------------------------------------------"
 
 
 
@@ -146,14 +145,14 @@ execStmt stmt = do
                 liftIO $ putStrLn $ gateName ++ " gate used on " ++ show qubitId ++ "-th qubit"
 
         isBasisState :: [Complex Double] -> Bool
-        isBasisState [a, b] = (magnitude a == 1 && magnitude b == 0) || (magnitude a == 0 && magnitude b == 1)
+        isBasisState [a, b] = magnitude a == 1 && magnitude b == 0 || magnitude a == 0 && magnitude b == 1
         isBasisState _ = False
 
-        isEntangled :: Int -> EvalM Bool
-        isEntangled qubitId' = do
-            env <- get
-            let entagledList = entangledId env
-            return $ any (qubitId' `elem`) entagledList
+        -- isEntangled :: Int -> EvalM Bool
+        -- isEntangled qubitId' = do
+        --     env <- get
+        --     let entagledList = entangledId env
+        --     return $ length (entagledList !! qubitId') > 1
 
         tensorProduct :: [Complex Double] -> [Complex Double] -> [Complex Double]
         tensorProduct [] _ = []
@@ -162,6 +161,24 @@ execStmt stmt = do
             let y = map (x *) vector2
                 ys = tensorProduct xs vector2
             in y ++ ys
+
+        updateEntanglementList :: [Int] -> [[Int]] -> [[Int]]
+        updateEntanglementList newEntangledId entangledList = [ if i `elem` newEntangledId then newEntangledId else oldEntanglement
+                    | (i, oldEntanglement) <- zip [0..] entangledList ]
+
+        updateQubitList :: [Int] -> [Complex Double] -> [[Complex Double]] -> [[Complex Double]]
+        updateQubitList newEntangledId newEntangledQubit qubitList = [ if i `elem` newEntangledId then newEntangledQubit else oldQubitList
+                    | (i, oldQubitList) <- zip [0..] qubitList ]
+
+        applyCnot :: [Complex Double] -> [Complex Double]
+        applyCnot qubit = goCnot qubit [] []
+
+        goCnot :: [Complex Double] -> [Complex Double] -> [Complex Double] -> [Complex Double]
+        goCnot [] firstHalf secondHalf = firstHalf ++ secondHalf
+        goCnot (x:xs) firstHalf secondHalf = if length (x:xs) > length firstHalf 
+            then goCnot xs (firstHalf ++ [x]) secondHalf 
+            else goCnot (tail xs) firstHalf (secondHalf ++ [head xs, x])
+
 
 execProgram :: [Statement] -> EvalM ()
 execProgram = mapM_ execStmt
