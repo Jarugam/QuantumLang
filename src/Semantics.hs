@@ -37,6 +37,12 @@ data Environment = Env
 
 type EvalM a = StateT Environment IO a
 
+identityMatrix :: [[Complex Double]]
+identityMatrix = 
+    [ [1 :+ 0, 0 :+ 0]
+    , [1 :+ 0, 0 :+ 0]
+    ]
+
 runEval :: Environment -> EvalM a -> IO(a, Environment)
 runEval env eval = runStateT eval env
 
@@ -55,66 +61,111 @@ execStmt stmt = do
             liftIO $ putStrLn $ "Initialized " ++ show n ++ " qubits"
 
         Hadamard qubitId -> do
-            let hadamard = fromLists
-                    [ [1/sqrt 2 :+ 0, 1/sqrt 2 :+ 0]
-                    , [1/sqrt 2 :+ 0, (- (1 / sqrt 2)) :+ 0]
-                    ]
-            applySingleGate "Hadamard" hadamard qubitId
+            env <- get
+            let hadamard =
+                        [ [1/sqrt 2 :+ 0, 1/sqrt 2 :+ 0]
+                        , [1/sqrt 2 :+ 0, (- (1 / sqrt 2)) :+ 0]
+                        ]
+            if length (entangledId env) == 1 then do
+                applySingleGate "Hadamard" (fromLists hadamard) qubitId
+            else do
+                if length (qubits env) <= qubitId || qubitId < 0 
+                    then liftIO $ putStrLn $ "No valid qubit with ID = " ++ show qubitId
+                else do
+                    let entanglementList = entangledId env !! qubitId
+                        oldQubit = qubits env !! qubitId
+                        largeHadamard = scaleGateMatrix hadamard qubitId entanglementList
+                        newQubit = applyGate (fromLists largeHadamard) oldQubit
+                        newQubitList = updateQubitList entanglementList newQubit (qubits env)
+                    put env {qubits = newQubitList}   
+                    liftIO $ putStrLn $ "Hadamard gate used on " ++ show qubitId ++ "-th qubit (entanglement updated)"
 
         PauliX qubitId -> do
-            let pauliX = fromLists
+            env <- get
+            let pauliX =
                         [ [0 :+ 0, 1 :+ 0]
                         , [1 :+ 0, 0 :+ 0]
                         ]
-            applySingleGate "Pauli X" pauliX qubitId
+            if length (entangledId env) == 1 then do
+                applySingleGate "Pauli X" (fromLists pauliX) qubitId
+            else do
+                let entanglementList = entangledId env !! qubitId
+                    oldQubit = qubits env !! qubitId
+                    largePauliX = scaleGateMatrix pauliX qubitId entanglementList
+                    newQubit = applyGate (fromLists largePauliX) oldQubit
+                    newQubitList = updateQubitList entanglementList newQubit (qubits env)
+                put env {qubits = newQubitList}   
+                liftIO $ putStrLn $ "Pauli X gate used on " ++ show qubitId ++ "-th qubit (entanglement updated)"
 
         PauliY qubitId -> do
-            let pauliY = fromLists
+            env <- get
+            let pauliY =
                         [ [0 :+ 0, 0 :+ 1]
                         , [0 :+ (-1), 0 :+ 0]
                         ]
-            applySingleGate "Pauli Y" pauliY qubitId
+            if length (entangledId env) == 1 then do
+                applySingleGate "Pauli Y" (fromLists pauliY) qubitId
+            else do
+                let entanglementList = entangledId env !! qubitId
+                    oldQubit = qubits env !! qubitId
+                    largePauliY = scaleGateMatrix pauliY qubitId entanglementList
+                    newQubit = applyGate (fromLists largePauliY) oldQubit
+                    newQubitList = updateQubitList entanglementList newQubit (qubits env)
+                put env {qubits = newQubitList}   
+                liftIO $ putStrLn $ "Pauli Y gate used on " ++ show qubitId ++ "-th qubit (entanglement updated)"
+            
 
         PauliZ qubitId -> do
-            let pauliZ = fromLists
+            env <- get
+            let pauliZ =
                         [ [1 :+ 0, 0 :+ 0]
                         , [0 :+ 0, (-1) :+ 0]
                         ]
-            applySingleGate "Pauli Z" pauliZ qubitId
+            if length (entangledId env) == 1 then do
+                applySingleGate "Pauli Z" (fromLists pauliZ) qubitId
+            else do
+                let entanglementList = entangledId env !! qubitId
+                    oldQubit = qubits env !! qubitId
+                    largePauliZ = scaleGateMatrix pauliZ qubitId entanglementList
+                    newQubit = applyGate (fromLists largePauliZ) oldQubit
+                    newQubitList = updateQubitList entanglementList newQubit (qubits env)
+                put env {qubits = newQubitList}   
+                liftIO $ putStrLn $ "Pauli Z gate used on " ++ show qubitId ++ "-th qubit (entanglement updated)"
 
         CNOT controlQubitId targetQubitId -> do
             env <- get
-            if length (qubits env) <= controlQubitId || controlQubitId < 0 ||
-                length (qubits env) <= targetQubitId || targetQubitId < 0
-                then liftIO $ putStrLn $ "No valid qubit with ID = " ++ show controlQubitId ++ " , or ID = " ++ show targetQubitId
-            else do
-                let qubitList = qubits env
-                    controlQubit = qubitList !! controlQubitId
-                    targetQubit = qubitList !! targetQubitId
-                if isBasisState controlQubit && isBasisState targetQubit then do
-                    case magnitude $ last controlQubit of
-                        1 -> do
-                            let xGate = fromLists [ [0 :+ 0, 1 :+ 0], [1 :+ 0, 0 :+ 0]]
-                                newTarget = applyGate xGate targetQubit
-                                newQubits = replace targetQubitId newTarget qubitList
-                            put env {qubits = newQubits}
-                            liftIO $ putStrLn $ "Cnot gate applied with cotrol = " ++ show controlQubitId ++ " and target = " ++ show targetQubitId
-                        _ -> liftIO $ putStrLn "Qubits left unchanged (ket 0 as control case)"
+            if targetQubitId `elem` entangledId env !! controlQubitId then
+                liftIO $ putStrLn "Error: CNOT gate cannot be used with control and target set as the same qubit"
                 else do
-                    let productVector = tensorProduct controlQubit targetQubit
-                        newVector = applyCnot productVector
-                        oldEntanglement = entangledId env
-                        controlEntanglement = oldEntanglement !! controlQubitId
-                        targetEntanglement = oldEntanglement !! targetQubitId
-                        newEntanglement = updateEntanglementList (controlEntanglement ++ targetEntanglement) oldEntanglement
-                        oldQubits = qubits env
-                        newQubits = updateQubitList (controlEntanglement ++ targetEntanglement) newVector oldQubits
-                    put env {qubits = newQubits, entangledId = newEntanglement}
-                    liftIO $ putStrLn $ "Cnot gate applied with cotrol = " ++ show controlQubitId ++ " and target = " ++ show targetQubitId
+                    if length (qubits env) <= controlQubitId || controlQubitId < 0 ||
+                        length (qubits env) <= targetQubitId || targetQubitId < 0
+                        then liftIO $ putStrLn $ "No valid qubit with ID = " ++ show controlQubitId ++ " , or ID = " ++ show targetQubitId
+                    else do
+                        let qubitList = qubits env
+                            controlQubit = qubitList !! controlQubitId
+                            targetQubit = qubitList !! targetQubitId
+                        if isBasisState controlQubit && isBasisState targetQubit then do
+                            case magnitude $ last controlQubit of
+                                1 -> do
+                                    let xGate = fromLists [ [0 :+ 0, 1 :+ 0], [1 :+ 0, 0 :+ 0]]
+                                        newTarget = applyGate xGate targetQubit
+                                        newQubits = replace targetQubitId newTarget qubitList
+                                    put env {qubits = newQubits}
+                                    liftIO $ putStrLn $ "Cnot gate applied with cotrol = " ++ show controlQubitId ++ " and target = " ++ show targetQubitId
+                                _ -> liftIO $ putStrLn "Qubits left unchanged (ket 0 as control case)"
+                        else do
+                            let productVector = tensorProduct controlQubit targetQubit
+                                newVector = applyCnot productVector
+                                oldEntanglement = entangledId env
+                                controlEntanglement = oldEntanglement !! controlQubitId
+                                targetEntanglement = oldEntanglement !! targetQubitId
+                                newEntanglement = updateEntanglementList (controlEntanglement ++ targetEntanglement) oldEntanglement
+                                oldQubits = qubits env
+                                newQubits = updateQubitList (controlEntanglement ++ targetEntanglement) newVector oldQubits
+                            put env {qubits = newQubits, entangledId = newEntanglement}
+                            liftIO $ putStrLn $ "Cnot gate applied with cotrol = " ++ show controlQubitId ++ " and target = " ++ show targetQubitId
 
         _ -> undefined
-
-
 
 
     currentState <- get
@@ -162,6 +213,26 @@ execStmt stmt = do
                 ys = tensorProduct xs vector2
             in y ++ ys
 
+        matrixTensorProduct :: [[Complex Double]] -> [[Complex Double]] -> [[Complex Double]]
+        matrixTensorProduct matrix1 matrix2 = goMatrix matrix1 matrix2 []
+         
+        goMatrix :: [[Complex Double]] -> [[Complex Double]] -> [[Complex Double]] -> [[Complex Double]]
+        goMatrix [] _ prod = prod
+        goMatrix (x:xs) matrix2' prod = 
+            let y = map (tensorProduct x) matrix2'
+            in goMatrix xs matrix2' (prod ++ y) 
+
+        scaleGateMatrix :: [[Complex Double]] -> Int -> [Int] -> [[Complex Double]]
+        scaleGateMatrix _ _ [] = []
+        scaleGateMatrix gateMatrix qId [x] = if qId == x
+            then gateMatrix
+            else identityMatrix
+        scaleGateMatrix gateMatrix qId (x:xs) = if qId == x 
+            then matrixTensorProduct gateMatrix (scaleGateMatrix gateMatrix qId xs)
+            else matrixTensorProduct identityMatrix (scaleGateMatrix gateMatrix qId xs)
+
+
+
         updateEntanglementList :: [Int] -> [[Int]] -> [[Int]]
         updateEntanglementList newEntangledId entangledList = [ if i `elem` newEntangledId then newEntangledId else oldEntanglement
                     | (i, oldEntanglement) <- zip [0..] entangledList ]
@@ -191,4 +262,4 @@ runProgram list = do
         initialEnv = Env {vars = Map.empty ,qubits = [], entangledId = []}
 
 example1 :: [Statement]
-example1 = [InitQubit 2, Hadamard 0, CNOT 0 1]
+example1 = [InitQubit 2, Hadamard 0]
