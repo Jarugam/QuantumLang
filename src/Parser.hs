@@ -62,7 +62,7 @@ integer :: Parser Int
 integer = fromIntegral <$> Token.integer lexer
 
 double :: Parser Double
-double = do 
+double = do
   sign <- option id (char '-' >> return negate)
   num <- Token.float lexer
   return (sign num)
@@ -145,7 +145,7 @@ measureStmt :: Parser Statement
 measureStmt = do
   reserved "MEASURE"
   firstVal <- integer
-  _ <- symbol "->" 
+  _ <- symbol "->"
   Measure firstVal <$> identifier
 
 ifStmt :: Parser Statement
@@ -163,8 +163,7 @@ repeatStmt = do
 printStmt :: Parser Statement
 printStmt = do
   reserved "PRINT"
-  msg <- stringLiteral <|> identifier
-  return $ Print msg
+  Print <$> identifier
 
 programParser :: Parser Program
 programParser = do

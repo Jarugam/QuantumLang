@@ -27,6 +27,7 @@ library
   exposed-modules:
       Lib
       Parser
+      Semantics
   other-modules:
       Paths_QuantumLang
   autogen-modules:
@@ -36,7 +37,12 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , containers >=0.6
+    , matrix
+    , mtl >=2.2
     , parsec
+    , random >=1.2
+    , vector >=0.13.2.0
   default-language: Haskell2010
 
 executable QuantumLang-exe
@@ -51,7 +57,12 @@ executable QuantumLang-exe
   build-depends:
       QuantumLang
     , base >=4.7 && <5
+    , containers >=0.6
+    , matrix
+    , mtl >=2.2
     , parsec
+    , random >=1.2
+    , vector >=0.13.2.0
   default-language: Haskell2010
 
 test-suite QuantumLang-test
@@ -70,8 +81,13 @@ test-suite QuantumLang-test
     , QuantumLang
     , QuickCheck >=2.14
     , base >=4.7 && <5
+    , containers >=0.6
+    , matrix
+    , mtl >=2.2
     , parsec
+    , random >=1.2
     , test-framework >=0.8
     , test-framework-hunit >=0.3
     , test-framework-quickcheck2 >=0.3
+    , vector >=0.13.2.0
   default-language: Haskell2010
