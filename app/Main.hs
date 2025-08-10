@@ -5,6 +5,7 @@ import System.Environment (getArgs)
 import System.IO (readFile)
 import Text.Parsec.Error (ParseError)
 import Parser
+import Semantics (runProgram)
 
 main :: IO ()
 main = parseFile
@@ -19,9 +20,12 @@ parseFile = do
                 Left err -> do
                     putStrLn "Parse Error:"
                     print err
-                Right ast -> do
+                Right (Program ast) -> do
                     putStrLn "Successfully parsed program:"
                     print ast
+                    putStrLn "================== Running the program ====================="
+                    _ <- runProgram ast
+                    return ()
         _ -> putStrLn "Usage: parser <filename>"
 
 parseAndPrint :: String -> IO ()

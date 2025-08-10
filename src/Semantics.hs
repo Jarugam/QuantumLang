@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Semantics where
 
@@ -35,6 +36,13 @@ data Environment = Env
                     , qubits :: [[Complex Double]]
                     , entangledId :: [[Int]]}
 
+instance Show Environment where
+    show :: Environment -> String
+    show Env{vars = vars', qubits = qubits', entangledId = entangledId'} = 
+        "=== Environment ===\nvars: " ++ show vars' ++
+        "\nquibits: " ++ show qubits' ++
+        "\nlist of entangled quibits" ++ show entangledId'
+
 type EvalM a = StateT Environment IO a
 
 identityMatrix :: [[Complex Double]]
@@ -50,15 +58,16 @@ execStmt :: Statement -> EvalM ()
 execStmt stmt = do
     case stmt of
         InitQubit n -> do
-            when (n < 1) $ liftIO $ putStrLn "Invalid ammount of initialized qubits"
-            env <- get
-            let newQubits = replicate n initQubit
-                lastId = length $ entangledId env
-                updatedQubits = qubits env ++ newQubits
-                newEntanglement = map (: []) $ take n $ drop lastId [0..]
-                updatedEntanglement = entangledId env ++ newEntanglement
-            put env {qubits = updatedQubits, entangledId = updatedEntanglement}
-            liftIO $ putStrLn $ "Initialized " ++ show n ++ " qubits"
+            if n < 1 then liftIO $ putStrLn "Invalid ammount of initialized qubits"
+            else do
+                env <- get
+                let newQubits = replicate n initQubit
+                    lastId = length $ entangledId env
+                    updatedQubits = qubits env ++ newQubits
+                    newEntanglement = map (: []) $ take n $ drop lastId [0..]
+                    updatedEntanglement = entangledId env ++ newEntanglement
+                put env {qubits = updatedQubits, entangledId = updatedEntanglement}
+                liftIO $ putStrLn $ "Initialized " ++ show n ++ " qubits"
 
         Hadamard qubitId -> do
             env <- get
@@ -215,7 +224,7 @@ execStmt stmt = do
                             newQubits = replace qubitId measuredState oldQubits
                             newVars = Map.insert varName result oldVariables  
                         put env {qubits = newQubits, vars = newVars}
-                        liftIO $ putStrLn $ "Measured qubit " ++ show qubitId ++ ", with base state: " ++ show result ++ "\nValue saved in variable: " ++ varName 
+                        liftIO $ putStrLn $ "Measured qubit " ++ show qubitId ++ ", as base state: " ++ show result ++ "\nValue saved in variable: " ++ varName 
                 else do
                     let qubitList = qubits env !! qubitId
                         qubitProbabilityList = map (\x -> magnitude x ^ 2) qubitList
@@ -229,7 +238,7 @@ execStmt stmt = do
                         newQubitsEntangled = map (\x -> if x == 0 then [1 :+ 0, 0 :+ 0] else [0 :+ 0, 1 :+ 0]) binList
                         newQubits = disentangleQubits newQubitsEntangled oldQubits (entangledId env !! qubitId)
                     put env {qubits = newQubits, vars = newVars}
-                    liftIO $ putStrLn $ "Measured qubit " ++ show qubitId ++ ", with base state: " ++ show result ++ "\nValue saved in variable: " ++ varName ++ " (entanglement updated)"
+                    liftIO $ putStrLn $ "Measured qubit " ++ show qubitId ++ ", as base state: " ++ show result ++ "\nValue saved in variable: " ++ varName ++ " (entanglement updated)"
 
         Print varName -> do
             env <- get
@@ -379,5 +388,33 @@ runProgram list = do
     where
         initialEnv = Env {vars = Map.empty ,qubits = [], entangledId = []}
 
+evalAndPrint :: String -> [Statement] -> IO ()
+evalAndPrint description instruction = do
+    result <- runStateT (execProgram instruction) initialEnv
+    putStrLn $ description ++ ": \n" ++ show result
+    where
+        initialEnv = Env {vars = Map.empty ,qubits = [], entangledId = []}
+
+testEvaluator :: IO ((), Environment)
+testEvaluator = do
+    liftIO $ putStrLn "=== Testing Expression Evaluator ==="
+
+    -- Test basic expressions
+    liftIO $ evalAndPrint "Quibit initialization" [InitQubit 2]
+    liftIO $ evalAndPrint "Hadamard gate" [InitQubit 2, Hadamard 1]
+    liftIO $ evalAndPrint "Pauli X gate" [InitQubit 2, PauliX 1]
+    liftIO $ evalAndPrint "Pauli Y gate" [InitQubit 2, PauliY 1]
+    liftIO $ evalAndPrint "Pauli Z gate" [InitQubit 2, PauliZ 1]
+    liftIO $ evalAndPrint "Phase gate" [InitQubit 2, Phase 1 0]
+
+    liftIO $ putStrLn "\n\t=== Running a Simple Program ==="
+    let simpleProgram = [ InitQubit 2, Hadamard 0, PauliX 0
+                        , PauliY 1, PauliZ 1, Phase 0.4 1
+                        , CNOT 0 1, Measure 0 "var1", Measure 1 "var2"
+                        , If "var1" [Print "var2"], Repeat 2 [Print "var1"]] 
+
+    runProgram simpleProgram
+    
+
 example1 :: [Statement]
-example1 = [InitQubit 1, PauliX 0, Repeat 3 [InitQubit 1]]
+example1 = [InitQubit (-1)]

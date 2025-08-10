@@ -8,7 +8,7 @@ PAULIX 1
 CNOT 0 1
 
 
-MEASURE 1 -> result
+MEASURE 0 -> result
 
 IF result {
   PAULIZ 0
