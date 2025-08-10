@@ -31,7 +31,7 @@ instance Show Value where
     show (VQubit vector) = show vector
 
 data Environment = Env
-                    { vars :: Map String Value
+                    { vars :: Map String Int
                     , qubits :: [[Complex Double]]
                     , entangledId :: [[Int]]}
 
@@ -195,12 +195,59 @@ execStmt stmt = do
                             put env {qubits = newQubits, entangledId = newEntanglement}
                             liftIO $ putStrLn $ "Cnot gate applied with cotrol = " ++ show controlQubitId ++ " and target = " ++ show targetQubitId
 
+        Measure qubitId varName  -> do
+            env <- get
+            if qubitId < 0 || qubitId >= length (qubits env)
+                then liftIO $ putStrLn $ "No valid qubit with ID = " ++ show qubitId
+            else do
+                if length (entangledId env !! qubitId) == 1 
+                    then do
+                        let qubit = qubits env !! qubitId
+                            alpha = head qubit
+                            pAlpha = magnitude alpha ^ 2
+                        r <- liftIO $ randomRIO (0.0, 1.0)
+                        let (result, measuredState) =
+                                if r < pAlpha
+                                    then (0, [1 :+ 0, 0 :+ 0])
+                                    else (1, [0 :+ 0, 1 :+ 0])
+                            oldQubits = qubits env
+                            oldVariables = vars env
+                            newQubits = replace qubitId measuredState oldQubits
+                            newVars = Map.insert varName result oldVariables  
+                        put env {qubits = newQubits, vars = newVars}
+                        liftIO $ putStrLn $ "Measured qubit " ++ show qubitId ++ ", with base state: " ++ show result ++ "\nValue saved in variable: " ++ varName 
+                else do
+                    let qubitList = qubits env !! qubitId
+                        qubitProbabilityList = map (\x -> magnitude x ^ 2) qubitList
+                    r <- liftIO $ randomRIO (0.0, 1.0)
+                    let stateIndex = findNewStateIndex qubitProbabilityList r
+                        binList = toBinary stateIndex (length (entangledId env !! qubitId))
+                        result = findResult binList (entangledId env !! qubitId) qubitId
+                        oldVariables = vars env 
+                        newVars = Map.insert varName result oldVariables
+                        oldQubits = qubits env
+                        newQubitsEntangled = map (\x -> if x == 0 then [1 :+ 0, 0 :+ 0] else [0 :+ 0, 1 :+ 0]) binList
+                        newQubits = disentangleQubits newQubitsEntangled oldQubits (entangledId env !! qubitId)
+                    put env {qubits = newQubits, vars = newVars}
+                    liftIO $ putStrLn $ "Measured qubit " ++ show qubitId ++ ", with base state: " ++ show result ++ "\nValue saved in variable: " ++ varName ++ " (entanglement updated)"
+
+        Print varName -> do
+            env <- get
+            let allVars = vars env
+            case Map.lookup varName allVars of
+                Nothing -> liftIO $ putStrLn $ "No variable found with the name: " ++ varName
+                Just value -> liftIO $ putStrLn $ "Printing variable: " ++ show varName ++ "\nvalue of variable: " ++ show value
+
+
+
         _ -> undefined
 
 
     currentState <- get
+    liftIO $ putStrLn "\n=== Environment Status === \n--------------------------------------------"
     liftIO $ putStrLn $ "Current state vector: " ++ show (qubits currentState) ++ "\n--------------------------------------------"
     liftIO $ putStrLn $ "Current entanglements: " ++ show (entangledId currentState) ++ "\n--------------------------------------------"
+    liftIO $ putStrLn $ "Current variables: " ++ show (vars currentState) ++ "\n--------------------------------------------\n"
 
 
 
@@ -261,8 +308,6 @@ execStmt stmt = do
             then matrixTensorProduct gateMatrix (scaleGateMatrix gateMatrix qId xs)
             else matrixTensorProduct identityMatrix (scaleGateMatrix gateMatrix qId xs)
 
-
-
         updateEntanglementList :: [Int] -> [[Int]] -> [[Int]]
         updateEntanglementList newEntangledId entangledList = [ if i `elem` newEntangledId then newEntangledId else oldEntanglement
                     | (i, oldEntanglement) <- zip [0..] entangledList ]
@@ -280,6 +325,34 @@ execStmt stmt = do
             then goCnot xs (firstHalf ++ [x]) secondHalf 
             else goCnot (tail xs) firstHalf (secondHalf ++ [head xs, x])
 
+        findNewStateIndex :: [Double] -> Double -> Int
+        findNewStateIndex probList prob = goFind probList prob 0
+
+        goFind :: [Double] -> Double -> Int -> Int
+        goFind [] _ _ = undefined
+        goFind (x:xs) p elId = if p <= x 
+            then elId
+            else goFind xs (p - x) (elId + 1)
+
+        toBinary :: Int -> Int ->[Int]
+        toBinary value size = goBinary value size []
+
+        goBinary :: Int -> Int -> [Int] -> [Int]
+        goBinary _ 0 acc = acc
+        goBinary 0 s acc = goBinary 0 (s - 1) [0] ++ acc
+        goBinary val s acc = goBinary (val `div` 2) (s - 1) [val `mod` 2] ++ acc
+
+        findResult :: [Int] -> [Int] -> Int -> Int
+        findResult [] _ _ = undefined
+        findResult _ [] _ = undefined
+        findResult (x:xs) (y:ys) qId = if qId == y 
+            then x
+            else findResult xs ys qId
+
+        disentangleQubits :: [[Complex Double]] -> [[Complex Double]] -> [Int] -> [[Complex Double]]
+        disentangleQubits [] oldQubitList _ = oldQubitList
+        disentangleQubits _ oldQubitList [] = oldQubitList
+        disentangleQubits (x:xs) oldQubitList (y:ys) = disentangleQubits xs (replace y x oldQubitList) ys
 
 execProgram :: [Statement] -> EvalM ()
 execProgram = mapM_ execStmt
@@ -292,4 +365,4 @@ runProgram list = do
         initialEnv = Env {vars = Map.empty ,qubits = [], entangledId = []}
 
 example1 :: [Statement]
-example1 = [InitQubit 2, CNOT 1 0]
+example1 = [InitQubit 2, Hadamard 0, CNOT 0 1, Measure 0 "Stefan", Print "Stefan"]
