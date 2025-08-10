@@ -238,9 +238,24 @@ execStmt stmt = do
                 Nothing -> liftIO $ putStrLn $ "No variable found with the name: " ++ varName
                 Just value -> liftIO $ putStrLn $ "Printing variable: " ++ show varName ++ "\nvalue of variable: " ++ show value
 
+        If varName instruction -> do
+            env <- get
+            let allVars = vars env
+            case Map.lookup varName allVars of
+                Nothing -> liftIO $ putStrLn $ "No variable found with the name: " ++ varName
+                Just 0 -> liftIO $ putStrLn "If condintion was not fulfilled"
+                Just _ -> do
+                    liftIO $ putStrLn "If condintion fulfilled, executing instructions...\n\n\t---=== If block start ===---"
+                    execProgram instruction
+                    liftIO $ putStrLn "\t---=== If block end ===---"
 
-
-        _ -> undefined
+        Repeat count instruction -> do
+            if count < 0 
+                then liftIO $ putStrLn $ "A set of instructions cannot be repeated " ++ show count ++ " times"
+                else do
+                    liftIO $ putStrLn $ "Repating instructions " ++ show count ++ " times\n\n\t---=== Repeat block start ===---"
+                    replicateM_ count $ execProgram instruction
+                    liftIO $ putStrLn "\t---=== Repeat block end ===---"
 
 
     currentState <- get
@@ -365,4 +380,4 @@ runProgram list = do
         initialEnv = Env {vars = Map.empty ,qubits = [], entangledId = []}
 
 example1 :: [Statement]
-example1 = [InitQubit 2, Hadamard 0, CNOT 0 1, Measure 0 "Stefan", Print "Stefan"]
+example1 = [InitQubit 1, PauliX 0, Repeat 3 [InitQubit 1]]
